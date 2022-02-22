@@ -1,0 +1,64 @@
+// Bremer's Cold Rocket Engine force measuring code, based off of NM Rocketry Review Code, modified for use
+//Make sure to use the calibration software to find the callibration value
+
+#include <HX711_ADC.h>
+#include <EEPROM.h>
+#define Relay 11
+
+//pins:
+const int HX711_dout = 8; //mcu > HX711 dout pin/edit based on your DAC pin usage
+const int HX711_sck = 9; //mcu > HX711 sck pin/edit based on your DAC pin usage
+
+//HX711 constructor:
+HX711_ADC LoadCell(HX711_dout, HX711_sck);
+
+const int calVal_eepromAdress = 0;
+long t;
+
+void setup() {
+  pinMode(Relay, OUTPUT);
+  Serial.begin(57600); delay(10);
+  Serial.println();
+  Serial.println("Measuring in 10 seconds");
+  delay(10000);
+
+  LoadCell.begin();
+  double calibrationValue; // paste the calibration value here
+  calibrationValue = -98.49; 
+  digitalWrite(Relay, HIGH);
+#if defined(ESP8266)|| defined(ESP32)
+  
+#endif
+  
+
+  long stabilizingtime = 3000; // preciscion right after power-up can be improved by adding a few seconds of stabilizing time
+  boolean _tare = true; //set this to false if you don't want tare to be performed in the next step
+  LoadCell.start(stabilizingtime, _tare);
+  if (LoadCell.getTareTimeoutFlag()) {
+    Serial.println("Timeout, check MCU>HX711 wiring and pin designations");
+    while (1);
+  }
+  else {
+    LoadCell.setCalFactor(calibrationValue); // set calibration value (float)
+    Serial.println("Startup is complete");
+  }
+}
+
+void loop() {
+  static boolean newDataReady = 0;
+  const int serialPrintInterval = 0; //increase value to slow down serial print activity
+
+  // check for new data/start next conversion:
+  if (LoadCell.update()) newDataReady = true;
+
+  // get smoothed value from the dataset:
+  if (newDataReady) {
+    if (millis() > t + serialPrintInterval) {
+      double i = LoadCell.getData();
+      Serial.print("GRAMS: ");
+      Serial.println(i);
+      newDataReady = 0;
+      t = millis();
+      }
+  }
+}
